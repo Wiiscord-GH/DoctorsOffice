@@ -1,0 +1,178 @@
+﻿@page "/newappointment"
+@attribute [Authorize]
+@using DoctorsOfficeV2.Data.Models;
+@using DoctorsOfficeV2.Data;
+@using Microsoft.AspNetCore.Identity;
+@using Microsoft.EntityFrameworkCore;
+@using System.Linq;
+@inject ApplicationDbContext _dbContext
+
+<PageTitle>New Appointment</PageTitle>
+
+<h1 class="text-center">New Appointment</h1>
+
+<div class="container">
+    <div class="form-group">
+        <label for="patient">Customer:</label>
+        @if (Patients == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <select class="form-control" id="patient" @bind="PatientId">
+                @foreach (var patient in Patients)
+                {
+                    <option value="@patient.Id">@patient.FirstName @patient.LastName</option>
+                }
+            </select>
+        }
+    </div>
+
+    <div class="form-group">
+        <label for="appointmentDate">Appointment Date:</label>
+        <input type="date" id="appointmentDate" @bind="SelectedDate" class="form-control" />
+    </div>
+
+    <div class="form-group">
+        <label for="prescribedMedicine">Prescribed Medicine:</label>
+        @if (Medications == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Select</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var medication in Medications)
+                    {
+                        <tr>
+                            <td>@medication.Name</td>
+                            <td class="form-check-input align-content-lg-stretch"><input class="form-check-input" type="checkbox" @onchange="() => ToggleMedSelection(medication)" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    @if (appointmentSaved)
+    {
+        <div class="alert alert-success alert-dismissible custom-alert">
+            Appointment saved successfully!
+            <button type="button" class="btn btn-success float-right" data-dismiss="alert" @onclick="CloseAlert">×</button>
+        </div>
+    }
+
+        @if (appointmentSavefaild)
+    {
+        <div class="alert alert-danger alert-dismissible custom-alert">
+            No Patient Selected. Please Select a Patient!
+            <button type="button" class="btn btn-danger float-right" data-dismiss="alert" @onclick="CloseAlert">×</button>
+        </div>
+    }
+
+    <div class="form-group">
+        <button type="button" class="btn btn-primary" @onclick="SaveAppointment">Save</button>
+    </div>
+</div>
+
+<style>
+    .custom-alert {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+</style>
+
+
+
+@code {
+    List<Patient> Patients;
+    List<Medication> Medications;
+    List<Medication> SelectedMedications;
+    int PatientId;
+    DateTime SelectedDate = DateTime.Now;
+    bool appointmentSaved = false;
+    bool appointmentSavefaild = false;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+    [Inject] 
+    UserManager<IdentityUser> userManager { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Patients = await _dbContext.Patients.ToListAsync();
+        Medications = await _dbContext.Medications.ToListAsync();
+        SelectedMedications = new List<Medication>();
+
+
+    }
+
+    private void ToggleMedSelection(Medication medication)
+    {
+        if (SelectedMedications.Contains(medication))
+        {
+            SelectedMedications.Remove(medication);
+        }
+        else
+        {
+            SelectedMedications.Add(medication);
+        }
+    }
+
+    private void CloseAlert()
+    {
+        appointmentSaved = false;
+        appointmentSavefaild = false;
+    }
+
+
+    private async Task SaveAppointment()
+    {
+        if(PatientId != 0)
+        {
+            Patient SelectedPatient = await _dbContext.Patients.Where(p => p.Id == PatientId).FirstOrDefaultAsync();
+            var user = (await authenticationStateTask).User;
+            var currentUser = await userManager.GetUserAsync(user);
+
+            var newAppointment = new Appointment
+            {
+                    Patient = SelectedPatient,
+                    Doctor = currentUser,
+                    Date = SelectedDate,
+            };
+            _dbContext.Appointments.Add(newAppointment);
+            await _dbContext.SaveChangesAsync();
+
+            foreach(var Medication in SelectedMedications)
+            {
+                var newAppointmentMedication = new AppointmentMedication
+                {
+                    Appointment = newAppointment,
+                    Medication = Medication,
+
+                };
+                _dbContext.AppointmentsMedications.Add(newAppointmentMedication);
+            }
+            await _dbContext.SaveChangesAsync();
+
+            PatientId = 0;
+            SelectedDate = DateTime.Now; 
+            SelectedMedications.Clear();
+            appointmentSaved = true;
+        }
+        else
+        {
+            appointmentSavefaild = true;
+        }
+
+    }
+}

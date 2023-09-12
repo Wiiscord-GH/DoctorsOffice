@@ -1,0 +1,103 @@
+﻿@page "/"
+@using DoctorsOfficeV2.Data.Models;
+@using DoctorsOfficeV2.Data
+@using Microsoft.AspNetCore.Identity;
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext _dbContext
+@attribute [Authorize]
+<PageTitle>Overview</PageTitle>
+
+<h1 class="text-center">Appointments Overview</h1>
+
+<div class="form-group">
+
+    <div class="form-group">
+        @if (Appointments == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Appointment Date</th>
+                        <th>Doctor</th>
+                        <th>Prescribed Medications</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var appointment in Appointments)
+                    {
+                        <tr>
+                            <td>@appointment.Patient.FirstName @appointment.Patient.LastName</td>
+                            <td>@appointment.Date.Date.ToShortDateString()</td>
+                            <td>@appointment.Doctor.Email</td>
+                            <td class="d-flex justify-content-center">
+                                <button class="btn btn-primary btn-block" @onclick="() => ShowPrescribedMedicationSite(appointment)">View</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="form-group">
+        @if (Medications == null)
+        {
+            <p><em>Select Appointment to see the Prscribed Medication</em></p>
+        }
+        else
+        {
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Medication Name</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var Medication in Medications)
+                    {
+                        <tr>
+                            <td>@Medication.Name</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+
+    </div>
+
+
+
+
+
+</div>
+
+@code
+{
+    List<Appointment> Appointments;
+    List<Medication> Medications;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Appointments = await _dbContext.Appointments.Include(p => p.Patient).Include(d => d.Doctor).ToListAsync();
+    }
+
+    private async void ShowPrescribedMedicationSite(Appointment appointment)
+    {
+        if (appointment != null)
+        {
+            Medications = await _dbContext.AppointmentsMedications.Where(am => am.Appointment.Id == appointment.Id).Select(am => am.Medication).ToListAsync();
+        }
+        else
+        {
+            Medications = null;
+        }
+    }
+
+
+}
